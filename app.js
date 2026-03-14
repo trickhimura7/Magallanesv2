@@ -1920,3 +1920,224 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
 
 // ── BOOT ──────────────────────────────────────────────────────
 boot();
+
+// ── XLSX TABLE IMPORT (DSWD / BAI) ────────────────────────────
+function injectXlsxImportCard() {
+  const wrap = document.querySelector(".migrate-wrap");
+  if (!wrap) return;
+  // Don't inject twice
+  if (document.getElementById("xlsxDropZone")) return;
+
+  const card = document.createElement("div");
+  card.className = "migrate-card";
+  card.style.marginTop = "24px";
+  card.innerHTML = `
+    <div class="migrate-icon">📊</div>
+    <h2>Import DSWD or BAI from XLSX</h2>
+    <p>Export the DSWD or BAI table from the old program as Excel (.xlsx), then upload it here.
+       The system detects columns automatically and shows a preview before importing.</p>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <select id="xlsxTableTarget" class="form-input" style="max-width:180px">
+        <option value="dswd">DSWD</option>
+        <option value="bai">BAI</option>
+      </select>
+      <select id="xlsxBranchTarget" class="form-input" style="max-width:220px"></select>
+    </div>
+    <div class="drop-zone" id="xlsxDropZone">
+      <div class="drop-icon">📂</div>
+      <div>Drop your XLSX file here, or <label for="xlsxFileInput" class="link-btn">browse</label></div>
+      <input type="file" id="xlsxFileInput" accept=".xlsx,.xls" style="display:none"/>
+    </div>
+    <div id="xlsxPreview" style="display:none;margin-top:16px">
+      <div class="migrate-summary" id="xlsxSummary"></div>
+      <div style="overflow-x:auto;margin-top:10px;max-height:260px;overflow-y:auto">
+        <table class="data-table" id="xlsxPreviewTable">
+          <thead id="xlsxPreviewHead"></thead>
+          <tbody id="xlsxPreviewBody"></tbody>
+        </table>
+      </div>
+      <div class="migrate-actions" style="margin-top:12px">
+        <button class="btn btn-secondary" id="btnXlsxCancel">Cancel</button>
+        <button class="btn btn-primary" id="btnXlsxConfirm">Import into selected branch</button>
+      </div>
+      <div id="xlsxProgress" style="display:none;margin-top:12px">
+        <div class="progress-bar"><div class="progress-fill" id="xlsxProgressFill"></div></div>
+        <div class="progress-label" id="xlsxProgressLabel">Importing...</div>
+      </div>
+    </div>
+  `;
+  wrap.appendChild(card);
+
+  // Populate branch dropdown
+  const brSel = card.querySelector("#xlsxBranchTarget");
+  APP.branches.forEach(b => {
+    const o = document.createElement("option");
+    o.value = b.id; o.textContent = b.name;
+    brSel.appendChild(o);
+  });
+
+  const dropZone  = card.querySelector("#xlsxDropZone");
+  const fileInput = card.querySelector("#xlsxFileInput");
+
+  dropZone.addEventListener("click",    () => fileInput.click());
+  dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault(); dropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files[0]) readXlsxFile(e.dataTransfer.files[0], card);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) readXlsxFile(fileInput.files[0], card);
+  });
+
+  card.querySelector("#btnXlsxCancel").addEventListener("click", () => {
+    card.querySelector("#xlsxPreview").style.display = "none";
+    fileInput.value = "";
+    window._xlsxRows = null;
+  });
+
+  card.querySelector("#btnXlsxConfirm").addEventListener("click", () => doXlsxImport(card));
+}
+
+function excelDateToStr(val) {
+  if (!val && val !== 0) return null;
+  if (typeof val === "string") {
+    const t = val.trim();
+    if (!t || t === "-" || t === "—") return null;
+    const d = new Date(t);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    return null;
+  }
+  if (typeof val === "number") {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+function readXlsxFile(file, card) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb    = XLSX.read(e.target.result, { type:"array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw   = XLSX.utils.sheet_to_json(sheet, { defval:"" });
+      if (!raw.length) { toast("No data found in the file.", "error"); return; }
+      const tableType     = card.querySelector("#xlsxTableTarget").value;
+      window._xlsxRows    = mapXlsxRows(raw, tableType);
+      showXlsxPreview(window._xlsxRows, tableType, card);
+    } catch(err) {
+      toast("Could not read file: " + err.message, "error");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function mapXlsxRows(rows, tableType) {
+  function norm(k) { return String(k).toLowerCase().replace(/[\s_#\-()\/.]+/g,""); }
+  return rows.map(r => {
+    const n = {};
+    for (const k of Object.keys(r)) n[norm(k)] = r[k];
+    const get = (...keys) => {
+      for (const k of keys) {
+        const v = n[norm(k)];
+        if (v !== undefined && v !== "") return v;
+      }
+      return null;
+    };
+    const getNum  = (...keys) => Number(get(...keys)) || 0;
+    const getDate = (...keys) => excelDateToStr(get(...keys));
+
+    if (tableType === "dswd") {
+      return {
+        date:          getDate("date","Date"),
+        contract_no:   get("contract","contract no","contractno","contract#","Contract","Contract No","Contract #"),
+        deceased:      get("deceased","name of deceased","Deceased","Name of Deceased"),
+        beneficiary:   get("beneficiary","Beneficiary"),
+        contract_amt:  getNum("contract amt","contractamt","contract amount","Contract Amt","Contract Amount"),
+        payment:       getNum("payment","Payment"),
+        balance:       getNum("balance","Balance"),
+        dswd_refund:   getNum("dswd refund","dswdrefund","DSWD Refund","dswd"),
+        after_tax:     getNum("after tax","aftertax","After Tax"),
+        date_received: getDate("date received","datereceived","Date Received"),
+        payable:       getNum("payable","Payable"),
+        date_release:  getDate("date release","daterelease","date released","Date Release","Date Released"),
+        dswd_discount: getNum("dswd discount","dswddiscount","DSWD Discount"),
+        status:        get("status","Status") || "Waiting",
+      };
+    }
+    if (tableType === "bai") {
+      return {
+        date_applied:   getDate("date applied","dateapplied","date","Date Applied","Date"),
+        contract_no:    get("contract","contract no","contractno","contract#","Contract","Contract No","Contract #"),
+        amount:         getNum("amount","Amount"),
+        date_completed: getDate("date completed","datecompleted","Date Completed"),
+        status:         get("status","Status") || "Pending",
+      };
+    }
+    return r;
+  });
+}
+
+function showXlsxPreview(rows, tableType, card) {
+  if (!rows.length) { toast("No rows to import.", "error"); return; }
+  card.querySelector("#xlsxSummary").innerHTML =
+    `<strong>${rows.length} rows</strong> detected as <strong>${tableType.toUpperCase()}</strong> records.<br/>
+     Preview of first 5 rows below — check the data looks correct before importing.`;
+  const keys = Object.keys(rows[0]);
+  card.querySelector("#xlsxPreviewHead").innerHTML = `<tr>${keys.map(k=>`<th>${k}</th>`).join("")}</tr>`;
+  card.querySelector("#xlsxPreviewBody").innerHTML = rows.slice(0,5).map(r=>
+    `<tr>${keys.map(k=>`<td style="font-size:11px;white-space:nowrap">${r[k]??""}</td>`).join("")}</tr>`
+  ).join("");
+  card.querySelector("#xlsxPreview").style.display = "block";
+}
+
+async function doXlsxImport(card) {
+  const rows     = window._xlsxRows;
+  const branchId = card.querySelector("#xlsxBranchTarget").value;
+  const table    = card.querySelector("#xlsxTableTarget").value;
+  if (!rows?.length) { toast("No data to import.", "error"); return; }
+  if (!branchId)     { toast("Select a branch.", "error"); return; }
+
+  const btnConfirm = card.querySelector("#btnXlsxConfirm");
+  btnConfirm.disabled = true;
+  card.querySelector("#xlsxProgress").style.display = "block";
+  card.querySelector("#xlsxProgressFill").style.width = "30%";
+  card.querySelector("#xlsxProgressLabel").textContent = `Importing ${rows.length} rows into ${table.toUpperCase()}...`;
+
+  const prepared = rows.map(r => {
+    const clean = { ...r };
+    delete clean.id;
+    clean.branch_id = branchId;
+    for (const k of Object.keys(clean)) {
+      if (clean[k] === "" || clean[k] === "—" || clean[k] === "-") clean[k] = null;
+    }
+    return clean;
+  });
+
+  try {
+    await DB.bulkInsert(table, prepared);
+    card.querySelector("#xlsxProgressFill").style.width = "100%";
+    card.querySelector("#xlsxProgressLabel").textContent = "Import complete!";
+    toast(`${rows.length} ${table.toUpperCase()} records imported.`, "success");
+    btnConfirm.disabled = false;
+    window._xlsxRows = null;
+    card.querySelector("#xlsxFileInput").value = "";
+    setTimeout(async () => {
+      await loadBranchData();
+      card.querySelector("#xlsxPreview").style.display = "none";
+      card.querySelector("#xlsxProgress").style.display = "none";
+    }, 1000);
+  } catch(err) {
+    card.querySelector("#xlsxProgressLabel").textContent = "Error: " + err.message;
+    btnConfirm.disabled = false;
+    toast("Import error: " + err.message, "error");
+  }
+}
+
+// Hook into navigation: inject card when migrate page is opened
+const _origNavigateTo = navigateTo;
+// Override nav to inject card when migrate page is visited
+document.querySelectorAll('.nav-item[data-page="migrate"]').forEach(n => {
+  n.addEventListener("click", () => setTimeout(injectXlsxImportCard, 300), true);
+});
