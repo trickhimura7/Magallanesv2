@@ -1804,74 +1804,74 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
 
   const tables = [
     { name:"contracts",    rows: prep(data.contracts, r=>({
-    date:r.date||null,
-    contract_no:r.contract||r.contract_no||null,
-    deceased:r.deceased||null,
-    casket:r.casket||null,
-    address:r.address||null,
-    amount:Number(r.amount)||0,
-    inhaus:Number(r.inhaus)||0,
-    bai:Number(r.bai)||0,
-    gl:Number(r.gl)||0,
-    gcash:Number(r.gcash)||0,
-    cash:Number(r.cash)||0,
-    discount:Number(r.discount)||0,
-    last_payment:r.lastPayment||r.last_payment||"—",
-  })) },
+        date:                r.date||null,
+        contract_no:         r.contract||r.contract_no||null,
+        deceased:            r.deceased||null,
+        casket:              r.casket||null,
+        address:             r.address||null,
+        amount:              Number(r.amount)||0,
+        inhaus:              Number(r.inhaus)||0,
+        bai:                 Number(r.bai)||0,
+        gl:                  Number(r.gl)||0,
+        gcash:               Number(r.gcash)||0,
+        cash:                Number(r.cash)||0,
+        discount:            Number(r.discount)||0,
+        last_payment:        r.lastPayment||r.last_payment||"—",
+      })) },
     { name:"cash_received",rows: prep(data.cashReceived||data.cash_received, r=>({
-    date:r.date||null,
-    contract_no:r.contract||r.contract_no||null,
-    receipt:r.receipt||null,
-    client:r.client||null,
-    particular:r.particular||null,
-    amount:Number(r.amount)||0,
-  })) },
+        date:                r.date||null,
+        contract_no:         r.contract||r.contract_no||null,
+        receipt:             r.receipt||null,
+        client:              r.client||null,
+        particular:          r.particular||null,
+        amount:              Number(r.amount)||0,
+      })) },
     { name:"cash_expense", rows: prep(data.cashExpense||data.cash_expense, r=>({
-    date:r.date||null,
-    particular:r.particular||null,
-    amount:Number(r.amount)||0,
-  })) },
+        date:                r.date||null,
+        particular:          r.particular||null,
+        amount:              Number(r.amount)||0,
+      })) },
     { name:"bank_received",rows: prep(data.bankReceived||data.bank_received, r=>({
-    date:r.date||null,
-    contract_no:r.contract||r.contract_no||null,
-    type:r.type||null,
-    client:r.client||null,
-    amount:Number(r.amount)||0,
-  })) },
+        date:                r.date||null,
+        contract_no:         r.contract||r.contract_no||null,
+        type:                r.type||null,
+        client:              r.client||null,
+        amount:              Number(r.amount)||0,
+      })) },
     { name:"bank_expense", rows: prep(data.bankExpense||data.bank_expense, r=>({
-    date:r.date||null,
-    cv:r.cv||null,
-    check_no:r.check||r.check_no||null,
-    particular:r.particular||null,
-    withdraw:Number(r.withdraw)||0,
-  })) },
+        date:                r.date||null,
+        cv:                  r.cv||null,
+        check_no:            r.check||r.check_no||null,
+        particular:          r.particular||null,
+        withdraw:            Number(r.withdraw)||0,
+      })) },
     { name:"pnb_deposit",  rows: prep(data.pnbDeposit||data.pnb_deposit, r=>({
-    date:r.date||null,
-    amount:Number(r.amount)||0,
-  })) },
-    { name:"dswd", rows: prep(data.dswd, r=>({
-    date:r.date||null,
-    contract_no:r.contract||r.contract_no||null,
-    deceased:r.deceased||null,
-    beneficiary:r.beneficiary||null,
-    contract_amt:Number(r.contractAmt||r.contract_amt)||0,
-    payment:Number(r.payment)||0,
-    balance:Number(r.balance)||0,
-    dswd_refund:Number(r.dswdRefund||r.dswd_refund)||0,
-    after_tax:Number(r.afterTax||r.after_tax)||0,
-    date_received:r.dateReceived||r.date_received||null,
-    payable:Number(r.payable)||0,
-    date_release:r.dateRelease||r.date_release||null,
-    dswd_discount:Number(r.dswdDiscount||r.dswd_discount)||0,
-    status:r.status||"Waiting",
-  })) },
-    { name:"bai", rows: prep(data.bai, r=>({
-    date_applied:r.dateApplied||r.date_applied||null,
-    contract_no:r.contract||r.contract_no||null,
-    amount:Number(r.amount)||0,
-    date_completed:r.dateCompleted||r.date_completed||null,
-    status:r.status||"Pending",
-  })) },
+        date:                r.date||null,
+        amount:              Number(r.amount)||0,
+      })) },
+    { name:"dswd",         rows: prep(data.dswd, r=>({
+        date:                r.date||null,
+        contract_no:         r.contract||r.contract_no||null,
+        deceased:            r.deceased||null,
+        beneficiary:         r.beneficiary||null,
+        contract_amt:        Number(r.contractAmt||r.contract_amt)||0,
+        payment:             Number(r.payment)||0,
+        balance:             Number(r.balance)||0,
+        dswd_refund:         Number(r.dswdRefund||r.dswd_refund)||0,
+        after_tax:           Number(r.afterTax||r.after_tax)||0,
+        date_received:       r.dateReceived||r.date_received||null,
+        payable:             Number(r.payable)||0,
+        date_release:        r.dateRelease||r.date_release||null,
+        dswd_discount:       Number(r.dswdDiscount||r.dswd_discount)||0,
+        status:              r.status||"Waiting",
+      })) },
+    { name:"bai",          rows: prep(data.bai, r=>({
+        date_applied:        r.dateApplied||r.date_applied||null,
+        contract_no:         r.contract||r.contract_no||null,
+        amount:              Number(r.amount)||0,
+        date_completed:      r.dateCompleted||r.date_completed||null,
+        status:              r.status||"Pending",
+      })) },
   ];
 
   let done = 0;
@@ -1884,15 +1884,20 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
       done++;
     }
 
-    // Handle settings cash/bank balance from v1
-    if (isV1 && data.settings) {
-      await DB.saveSettings(branchId, {
-        cashBalance:  data.settings.cash_balance||data.settings.cashBalance||0,
-        bankBalance:  data.settings.bank_balance||data.settings.bankBalance||0,
-        financeClerk: data.settings.finance_clerk||data.settings.financeClerk||"",
-        accountant:   data.settings.accountant||"",
-        financeManager: data.settings.finance_manager||data.settings.financeManager||"",
-      });
+    // Handle settings cash/bank balance from old or new backup
+    const s = data.settings;
+    if (s) {
+      // s might be an object (v1) or an array (v2 backup)
+      const sObj = Array.isArray(s) ? s[0] : s;
+      if (sObj) {
+        await DB.saveSettings(branchId, {
+          cashBalance:    Number(sObj.cash_balance  || sObj.cashBalance)  || 0,
+          bankBalance:    Number(sObj.bank_balance  || sObj.bankBalance)  || 0,
+          financeClerk:   sObj.finance_clerk  || sObj.financeClerk  || "",
+          accountant:     sObj.accountant     || "",
+          financeManager: sObj.finance_manager|| sObj.financeManager|| "",
+        });
+      }
     }
 
     $("progressFill").style.width = "100%";
@@ -1904,7 +1909,7 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
       $("migratePreview").style.display = "none";
       _migrateData = null;
       if (fileInput) fileInput.value = "";
-      $("sigrateProgress").style.display = "none";
+      $("migrateProgress").style.display = "none";
     }, 1200);
   } catch(err) {
     $("progressLabel").textContent = "Error: "+err.message;
