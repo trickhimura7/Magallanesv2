@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Magallanes Funeral Services</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<!-- ── LOGIN OVERLAY ─────────────────────────────────────── -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">MF</div>
+      <div class="login-title">Magallanes Funeral</div>
+      <div class="login-sub">Services Management System</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input id="loginEmail" type="email" class="form-input" placeholder="you@example.com" autocomplete="username"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input id="loginPassword" type="password" class="form-input" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <div id="loginError" class="login-error" style="display:none"></div>
+    <button id="btnLogin" class="btn btn-primary btn-block">Sign In</button>
+    <div id="loginSpinner" class="spinner" style="display:none;margin:10px auto"></div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ─────────────────────────────────────────── -->
+<div id="appShell" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark sm">MF</div>
+      <div class="sidebar-brand">
+        <span class="brand-name">Magallanes</span>
+        <span class="brand-sub">Funeral Services</span>
+      </div>
+      <button id="sidebarToggle" class="sidebar-toggle" title="Collapse">‹</button>
+    </div>
+
+    <!-- Branch Selector -->
+    <div class="branch-selector" id="branchSelectorWrap">
+      <label class="branch-label">Branch</label>
+      <select id="branchSelect" class="branch-select"></select>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">⊞</span><span class="nav-text">Dashboard</span>
+      </a>
+      <a class="nav-item" data-page="contracts">
+        <span class="nav-icon">☰</span><span class="nav-text">Contracts</span>
+      </a>
+      <div class="nav-group-label">Transactions</div>
+      <a class="nav-item" data-page="cash-received">
+        <span class="nav-icon">↓</span><span class="nav-text">Cash Received</span>
+      </a>
+      <a class="nav-item" data-page="cash-expense">
+        <span class="nav-icon">↑</span><span class="nav-text">Cash Expense</span>
+      </a>
+      <a class="nav-item" data-page="bank-received">
+        <span class="nav-icon">↓</span><span class="nav-text">Bank Received</span>
+      </a>
+      <a class="nav-item" data-page="bank-expense">
+        <span class="nav-icon">↑</span><span class="nav-text">Bank Expense</span>
+      </a>
+      <a class="nav-item" data-page="pnb-deposit">
+        <span class="nav-icon">⇄</span><span class="nav-text">PNB Deposit</span>
+      </a>
+      <div class="nav-group-label">Assistance</div>
+      <a class="nav-item" data-page="dswd">
+        <span class="nav-icon">◈</span><span class="nav-text">DSWD</span>
+      </a>
+      <a class="nav-item" data-page="bai">
+        <span class="nav-icon">◈</span><span class="nav-text">BAI</span>
+      </a>
+      <div class="nav-group-label">Management</div>
+      <a class="nav-item" data-page="reports">
+        <span class="nav-icon">▦</span><span class="nav-text">Reports</span>
+      </a>
+      <a class="nav-item admin-only" data-page="branches">
+        <span class="nav-icon">◫</span><span class="nav-text">Branches</span>
+      </a>
+      <a class="nav-item admin-only" data-page="users">
+        <span class="nav-icon">◯</span><span class="nav-text">Users</span>
+      </a>
+      <a class="nav-item" data-page="migrate">
+        <span class="nav-icon">⇪</span><span class="nav-text">Import / Migrate</span>
+      </a>
+      <a class="nav-item" data-page="settings">
+        <span class="nav-icon">⚙</span><span class="nav-text">Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-details">
+          <div class="user-name" id="userName">—</div>
+          <div class="user-role" id="userRole">—</div>
+        </div>
+      </div>
+      <button id="btnSignOut" class="signout-btn" title="Sign out">⏻</button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="mobileSidebarToggle" class="mobile-menu-btn">☰</button>
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+      </div>
+      <div class="topbar-right">
+        <div class="date-display" id="dateDisplay"></div>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- DASHBOARD -->
+      <section id="page-dashboard" class="page active">
+        <div class="summary-cards" id="summaryCards"></div>
+        <div class="dashboard-grid">
+          <div class="dash-panel">
+            <div class="dash-panel-title">Cash Balance Trend (This Month)</div>
+            <canvas id="balanceChart" height="200"></canvas>
+          </div>
+          <div class="dash-panel">
+            <div class="dash-panel-title">Recent Transactions</div>
+            <div id="recentTxList" class="recent-tx-list"></div>
+          </div>
+        </div>
+        <div class="dash-panel" id="overduePanel" style="margin-top:16px">
+          <div class="dash-panel-title">Overdue Balances <span class="badge badge-danger" id="overdueCount">0</span></div>
+          <div id="overdueList"></div>
+        </div>
+      </section>
+
+      <!-- CONTRACTS -->
+      <section id="page-contracts" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input id="contractSearch" type="text" class="search-input" placeholder="Search by name, contract #, casket…"/>
+            <select id="contractMonthFilter" class="filter-select">
+              <option value="">All months</option>
+            </select>
+            <select id="contractStatusFilter" class="filter-select">
+              <option value="">All statuses</option>
+              <option value="paid">Paid in full</option>
+              <option value="active">Active</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <span class="row-count" id="contractRowCount">0 records</span>
+            <button class="btn btn-secondary" id="btnExportContractsXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddContract">+ New Contract</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="contractsTable">
+            <thead>
+              <tr>
+                <th>Date</th><th>Contract #</th><th>Deceased</th><th>Casket</th>
+                <th>Address</th><th class="num">Amount</th><th class="num">In-Haus</th>
+                <th class="num">GCash</th><th class="num">Cash</th><th class="num">GL</th>
+                <th class="num">DSWD</th><th class="num">DSWD Disc</th><th class="num">BAI</th>
+                <th class="num">Discount</th><th class="num">Total Paid</th>
+                <th class="num">Remaining</th><th>Status</th><th>Last Payment</th>
+                <th class="action-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="contractsTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CASH RECEIVED -->
+      <section id="page-cash-received" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="date" id="crDateFilter" class="filter-input"/>
+            <input type="text" id="crSearch" class="search-input" placeholder="Search…"/>
+          </div>
+          <div class="toolbar-right">
+            <div class="balance-pill">Cash balance: <strong id="cashBalanceDisplay">₱0.00</strong></div>
+            <button class="btn btn-secondary" id="btnExportCRXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddCR">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="crTable">
+            <thead><tr>
+              <th>Date</th><th>Contract #</th><th>Receipt</th><th>Client</th>
+              <th>Particular</th><th class="num">Amount</th><th class="num">Running Balance</th>
+              <th>By</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="crTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CASH EXPENSE -->
+      <section id="page-cash-expense" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="date" id="ceDateFilter" class="filter-input"/>
+            <input type="text" id="ceSearch" class="search-input" placeholder="Search…"/>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary" id="btnExportCEXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddCE">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="ceTable">
+            <thead><tr>
+              <th>Date</th><th>Particular</th><th class="num">Amount</th>
+              <th>By</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="ceTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- BANK RECEIVED -->
+      <section id="page-bank-received" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="date" id="brDateFilter" class="filter-input"/>
+            <input type="text" id="brSearch" class="search-input" placeholder="Search…"/>
+          </div>
+          <div class="toolbar-right">
+            <div class="balance-pill">Bank balance: <strong id="bankBalanceDisplay">₱0.00</strong></div>
+            <button class="btn btn-secondary" id="btnExportBRXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddBR">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="brTable">
+            <thead><tr>
+              <th>Date</th><th>Contract #</th><th>Type</th><th>Client</th>
+              <th class="num">Amount</th><th class="num">Running Balance</th>
+              <th>By</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="brTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- BANK EXPENSE -->
+      <section id="page-bank-expense" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="date" id="beDateFilter" class="filter-input"/>
+            <input type="text" id="beSearch" class="search-input" placeholder="Search…"/>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary" id="btnExportBEXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddBE">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="beTable">
+            <thead><tr>
+              <th>Date</th><th>CV</th><th>Check #</th><th>Particular</th>
+              <th class="num">Withdraw</th><th class="num">Running Balance</th>
+              <th>By</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="beTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PNB DEPOSIT -->
+      <section id="page-pnb-deposit" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="date" id="pnbDateFilter" class="filter-input"/>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary" id="btnExportPNBXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddPNB">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="pnbTable">
+            <thead><tr>
+              <th>Date</th><th class="num">Amount</th>
+              <th>By</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="pnbTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- DSWD -->
+      <section id="page-dswd" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="text" id="dswdSearch" class="search-input" placeholder="Search…"/>
+            <select id="dswdStatusFilter" class="filter-select">
+              <option value="">All statuses</option>
+              <option value="Waiting">Waiting</option>
+              <option value="Received">Received</option>
+              <option value="Released">Released</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <div class="balance-pill">Pending: <strong id="dswdPendingDisplay">₱0.00</strong></div>
+            <button class="btn btn-secondary" id="btnExportDSWDXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddDSWD">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="dswdTable">
+            <thead><tr>
+              <th>Date</th><th>Contract #</th><th>Deceased</th>
+              <th class="num">Contract Amt</th><th class="num">Payment</th><th class="num">Balance</th>
+              <th class="num">DSWD Refund</th><th class="num">After Tax</th>
+              <th>Date Received</th><th class="num">Payable</th><th>Release Date</th>
+              <th>Beneficiary</th><th class="num">DSWD Disc</th><th>Status</th>
+              <th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="dswdTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- BAI -->
+      <section id="page-bai" class="page">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="text" id="baiSearch" class="search-input" placeholder="Search…"/>
+            <select id="baiStatusFilter" class="filter-select">
+              <option value="">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Collected">Collected</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <div class="balance-pill">Uncollected: <strong id="baiPendingDisplay">₱0.00</strong></div>
+            <button class="btn btn-secondary" id="btnExportBAIXLSX">Export XLSX</button>
+            <button class="btn btn-primary clerk-up" id="btnAddBAI">+ Add</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="baiTable">
+            <thead><tr>
+              <th>Date Applied</th><th>Contract #</th><th class="num">Amount</th>
+              <th>Date Completed</th><th>Status</th>
+              <th>By</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="baiTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- REPORTS -->
+      <section id="page-reports" class="page">
+        <div class="reports-grid">
+          <div class="report-card" id="rptDaily">
+            <div class="rpt-icon">📋</div>
+            <div class="rpt-title">Daily Report</div>
+            <div class="rpt-desc">Cash + bank summary for a single day</div>
+            <input type="date" id="rptDailyDate" class="form-input" style="margin-top:10px"/>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptDaily">Generate PDF</button>
+          </div>
+          <div class="report-card" id="rptWeekly">
+            <div class="rpt-icon">📊</div>
+            <div class="rpt-title">Weekly Report</div>
+            <div class="rpt-desc">7-day summary of all transactions</div>
+            <input type="date" id="rptWeeklyStart" class="form-input" style="margin-top:10px" placeholder="Week start"/>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptWeekly">Generate PDF</button>
+            <button class="btn btn-secondary" style="margin-top:6px;width:100%" id="btnRptWeeklyXLSX">Export XLSX</button>
+          </div>
+          <div class="report-card" id="rptMonthly">
+            <div class="rpt-icon">📅</div>
+            <div class="rpt-title">Monthly Report</div>
+            <div class="rpt-desc">Full month summary with totals</div>
+            <select id="rptMonthYear" class="form-input" style="margin-top:10px"></select>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptMonthly">Generate PDF</button>
+            <button class="btn btn-secondary" style="margin-top:6px;width:100%" id="btnRptMonthlyXLSX">Export XLSX</button>
+          </div>
+          <div class="report-card" id="rptYearly">
+            <div class="rpt-icon">📆</div>
+            <div class="rpt-title">Yearly Report</div>
+            <div class="rpt-desc">Annual summary by month</div>
+            <select id="rptYear" class="form-input" style="margin-top:10px"></select>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptYearly">Generate PDF</button>
+            <button class="btn btn-secondary" style="margin-top:6px;width:100%" id="btnRptYearlyXLSX">Export XLSX</button>
+          </div>
+          <div class="report-card" id="rptOverdue">
+            <div class="rpt-icon">⚠</div>
+            <div class="rpt-title">Overdue Balances</div>
+            <div class="rpt-desc">Clients with outstanding balance</div>
+            <select id="rptOverdueDays" class="form-input" style="margin-top:10px">
+              <option value="30">30+ days no payment</option>
+              <option value="60" selected>60+ days no payment</option>
+              <option value="90">90+ days no payment</option>
+            </select>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptOverdue">Generate PDF</button>
+          </div>
+          <div class="report-card admin-only" id="rptBranch">
+            <div class="rpt-icon">🏢</div>
+            <div class="rpt-title">Branch Comparison</div>
+            <div class="rpt-desc">Side-by-side across all branches</div>
+            <select id="rptBranchMonthYear" class="form-input" style="margin-top:10px"></select>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptBranch">Generate PDF</button>
+            <button class="btn btn-secondary" style="margin-top:6px;width:100%" id="btnRptBranchXLSX">Export XLSX</button>
+          </div>
+          <div class="report-card" id="rptClient">
+            <div class="rpt-icon">👤</div>
+            <div class="rpt-title">Client Payment Report</div>
+            <div class="rpt-desc">Full payment history for one client</div>
+            <input type="text" id="rptClientContract" class="form-input" style="margin-top:10px" placeholder="Contract # or name…"/>
+            <button class="btn btn-primary" style="margin-top:8px;width:100%" id="btnRptClient">Generate PDF</button>
+          </div>
+          <div class="report-card admin-only" id="rptFullBackup">
+            <div class="rpt-icon">💾</div>
+            <div class="rpt-title">Full Data Backup</div>
+            <div class="rpt-desc">Export all tables to one XLSX file</div>
+            <button class="btn btn-primary" style="margin-top:18px;width:100%" id="btnFullBackup">Download XLSX Backup</button>
+            <button class="btn btn-secondary" style="margin-top:6px;width:100%" id="btnFullBackupJSON">Download JSON Backup</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- BRANCHES (admin only) -->
+      <section id="page-branches" class="page admin-only">
+        <div class="toolbar">
+          <div class="toolbar-right">
+            <button class="btn btn-primary" id="btnAddBranch">+ Add Branch</button>
+          </div>
+        </div>
+        <div id="branchCards" class="branch-cards"></div>
+      </section>
+
+      <!-- USERS (admin only) -->
+      <section id="page-users" class="page admin-only">
+        <div class="toolbar">
+          <div class="toolbar-right">
+            <button class="btn btn-primary" id="btnInviteUser">+ Invite User</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="usersTable">
+            <thead><tr>
+              <th>Name</th><th>Email</th><th>Role</th><th>Branch</th>
+              <th>Last Login</th><th>Status</th><th class="action-col">Actions</th>
+            </tr></thead>
+            <tbody id="usersTbody"></tbody>
+          </table>
+        </div>
+        <div class="info-panel" style="margin-top:16px">
+          <strong>Audit Log</strong> — last 50 actions
+          <div class="table-wrap" style="margin-top:8px">
+            <table class="data-table" id="auditTable">
+              <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Table</th><th>Details</th></tr></thead>
+              <tbody id="auditTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- IMPORT / MIGRATE -->
+      <section id="page-migrate" class="page">
+        <div class="migrate-wrap">
+          <div class="migrate-card">
+            <div class="migrate-icon">⇪</div>
+            <h2>Import from old system</h2>
+            <p>Export your data from the old Magallanes app using its "Export JSON" button, then upload that file here. The system will preview the data before importing — nothing is written until you confirm.</p>
+            <div class="drop-zone" id="dropZone">
+              <div class="drop-icon">📂</div>
+              <div>Drop your backup JSON file here, or <label for="fileInput" class="link-btn">browse</label></div>
+              <input type="file" id="fileInput" accept=".json" style="display:none"/>
+            </div>
+            <div id="migratePreview" style="display:none">
+              <div class="migrate-summary" id="migrateSummary"></div>
+              <div class="migrate-actions">
+                <button class="btn btn-secondary" id="btnMigrateCancel">Cancel</button>
+                <select id="migrateBranchTarget" class="form-input" style="max-width:220px"></select>
+                <button class="btn btn-primary" id="btnMigrateConfirm">Import into selected branch</button>
+              </div>
+              <div id="migrateProgress" style="display:none">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-label" id="progressLabel">Importing…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="page-settings" class="page">
+        <div class="settings-wrap">
+          <div class="settings-card">
+            <h3>Opening Balances</h3>
+            <p class="settings-hint">Set the starting cash and bank balance for the selected branch. These are only needed for the initial setup — balances carry forward automatically after that.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Opening Cash Balance (₱)</label>
+                <input id="setCashBalance" type="number" step="0.01" class="form-input"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Opening Bank Balance (₱)</label>
+                <input id="setBankBalance" type="number" step="0.01" class="form-input"/>
+              </div>
+            </div>
+          </div>
+          <div class="settings-card">
+            <h3>Signatory Names</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Finance Clerk</label>
+                <input id="setFinanceClerk" type="text" class="form-input"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Accountant</label>
+                <input id="setAccountant" type="text" class="form-input"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Finance Manager</label>
+                <input id="setFinanceManager" type="text" class="form-input"/>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="btnSaveSettings">Save Settings</button>
+          </div>
+          <div class="settings-card admin-only">
+            <h3>Danger Zone</h3>
+            <p class="settings-hint danger-text">These actions are permanent and cannot be undone. Admin only.</p>
+            <button class="btn btn-danger" id="btnDangerClear">Clear All Data for This Branch…</button>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /page-content -->
+  </main>
+</div><!-- /appShell -->
+
+<!-- ── UNIVERSAL MODAL ───────────────────────────────────── -->
+<div id="modal" class="modal-overlay" style="display:none">
+  <div class="modal-box" id="modalBox">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Title</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- ── TOAST ─────────────────────────────────────────────── -->
+<div id="toast" class="toast" style="display:none"></div>
+
+<script src="supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
