@@ -1803,21 +1803,39 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
   }
 
   const tables = [
-    { name:"contracts",    rows: prep(data.contracts, isV1 ? r=>({
-        date:r.date, contract_no:r.contract||r.contract_no, deceased:r.deceased, casket:r.casket,
-        address:r.address, amount:r.amount, inhaus:r.inhaus, bai:r.bai||0, gl:r.gl||0,
-        gcash:r.gcash, cash:r.cash, discount:r.discount||0, last_payment:r.lastPayment||r.last_payment||"—"
-      }) : null) },
-    { name:"cash_received",rows: prep(data.cashReceived||data.cash_received, isV1 ? r=>({
-        date:r.date, contract_no:r.contract||r.contract_no, receipt:r.receipt,
-        client:r.client, particular:r.particular, amount:r.amount
-      }) : null) },
+    { name:"contracts",    rows: prep(data.contracts, r=>({
+    date:r.date||null,
+    contract_no:r.contract||r.contract_no||null,
+    deceased:r.deceased||null,
+    casket:r.casket||null,
+    address:r.address||null,
+    amount:Number(r.amount)||0,
+    inhaus:Number(r.inhaus)||0,
+    bai:Number(r.bai)||0,
+    gl:Number(r.gl)||0,
+    gcash:Number(r.gcash)||0,
+    cash:Number(r.cash)||0,
+    discount:Number(r.discount)||0,
+    last_payment:r.lastPayment||r.last_payment||"—",
+  })) },
+    { name:"cash_received",rows: prep(data.cashReceived||data.cash_received, r=>({
+    date:r.date||null,
+    contract_no:r.contract||r.contract_no||null,
+    receipt:r.receipt||null,
+    client:r.client||null,
+    particular:r.particular||null,
+    amount:Number(r.amount)||0,
+  })) },
     { name:"cash_expense", rows: prep(data.cashExpense||data.cash_expense, isV1 ? r=>({
         date:r.date, particular:r.particular, amount:r.amount
       }) : null) },
-    { name:"bank_received",rows: prep(data.bankReceived||data.bank_received, isV1 ? r=>({
-        date:r.date, contract_no:r.contract||r.contract_no, type:r.type, client:r.client, amount:r.amount
-      }) : null) },
+    { name:"bank_received",rows: prep(data.bankReceived||data.bank_received, r=>({
+    date:r.date||null,
+    contract_no:r.contract||r.contract_no||null,
+    type:r.type||null,
+    client:r.client||null,
+    amount:Number(r.amount)||0,
+  })) },
     { name:"bank_expense", rows: prep(data.bankExpense||data.bank_expense, isV1 ? r=>({
         date:r.date, cv:r.cv, check_no:r.check||r.check_no, particular:r.particular, withdraw:r.withdraw
       }) : null) },
