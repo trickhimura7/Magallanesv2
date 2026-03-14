@@ -1826,9 +1826,11 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
     particular:r.particular||null,
     amount:Number(r.amount)||0,
   })) },
-    { name:"cash_expense", rows: prep(data.cashExpense||data.cash_expense, isV1 ? r=>({
-        date:r.date, particular:r.particular, amount:r.amount
-      }) : null) },
+    { name:"cash_expense", rows: prep(data.cashExpense||data.cash_expense, r=>({
+    date:r.date||null,
+    particular:r.particular||null,
+    amount:Number(r.amount)||0,
+  })) },
     { name:"bank_received",rows: prep(data.bankReceived||data.bank_received, r=>({
     date:r.date||null,
     contract_no:r.contract||r.contract_no||null,
@@ -1836,24 +1838,40 @@ $("btnMigrateConfirm")?.addEventListener("click", async () => {
     client:r.client||null,
     amount:Number(r.amount)||0,
   })) },
-    { name:"bank_expense", rows: prep(data.bankExpense||data.bank_expense, isV1 ? r=>({
-        date:r.date, cv:r.cv, check_no:r.check||r.check_no, particular:r.particular, withdraw:r.withdraw
-      }) : null) },
-    { name:"pnb_deposit",  rows: prep(data.pnbDeposit||data.pnb_deposit, isV1 ? r=>({
-        date:r.date, amount:r.amount
-      }) : null) },
-    { name:"dswd",         rows: prep(data.dswd, isV1 ? r=>({
-        date:r.date, contract_no:r.contract||r.contract_no, deceased:r.deceased,
-        contract_amt:r.contractAmt||r.contract_amt||0, payment:r.payment||0, balance:r.balance||0,
-        dswd_refund:r.dswdRefund||r.dswd_refund||0, after_tax:r.afterTax||r.after_tax||0,
-        date_received:r.dateReceived||r.date_received||null, payable:r.payable||0,
-        date_release:r.dateRelease||r.date_release||null, beneficiary:r.beneficiary||null,
-        dswd_discount:r.dswdDiscount||r.dswd_discount||0, status:r.status||"Waiting"
-      }) : null) },
-    { name:"bai",          rows: prep(data.bai, isV1 ? r=>({
-        date_applied:r.dateApplied||r.date_applied||null, contract_no:r.contract||r.contract_no,
-        amount:r.amount||0, date_completed:r.dateCompleted||r.date_completed||null, status:r.status||"Pending"
-      }) : null) },
+    { name:"bank_expense", rows: prep(data.bankExpense||data.bank_expense, r=>({
+    date:r.date||null,
+    cv:r.cv||null,
+    check_no:r.check||r.check_no||null,
+    particular:r.particular||null,
+    withdraw:Number(r.withdraw)||0,
+  })) },
+    { name:"pnb_deposit",  rows: prep(data.pnbDeposit||data.pnb_deposit, r=>({
+    date:r.date||null,
+    amount:Number(r.amount)||0,
+  })) },
+    { name:"dswd", rows: prep(data.dswd, r=>({
+    date:r.date||null,
+    contract_no:r.contract||r.contract_no||null,
+    deceased:r.deceased||null,
+    beneficiary:r.beneficiary||null,
+    contract_amt:Number(r.contractAmt||r.contract_amt)||0,
+    payment:Number(r.payment)||0,
+    balance:Number(r.balance)||0,
+    dswd_refund:Number(r.dswdRefund||r.dswd_refund)||0,
+    after_tax:Number(r.afterTax||r.after_tax)||0,
+    date_received:r.dateReceived||r.date_received||null,
+    payable:Number(r.payable)||0,
+    date_release:r.dateRelease||r.date_release||null,
+    dswd_discount:Number(r.dswdDiscount||r.dswd_discount)||0,
+    status:r.status||"Waiting",
+  })) },
+    { name:"bai", rows: prep(data.bai, r=>({
+    date_applied:r.dateApplied||r.date_applied||null,
+    contract_no:r.contract||r.contract_no||null,
+    amount:Number(r.amount)||0,
+    date_completed:r.dateCompleted||r.date_completed||null,
+    status:r.status||"Pending",
+  })) },
   ];
 
   let done = 0;
