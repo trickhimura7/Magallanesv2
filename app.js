@@ -18,7 +18,17 @@ function fmtNum(n) {
 }
 function fmtDate(d) {
   if (!d) return "—";
-  const dt = new Date(d + "T00:00:00");
+  const s = String(d).trim();
+  if (!s || s === "—" || s === "-") return "—";
+  let dt;
+  // Already MM/DD/YYYY — parse directly
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) {
+    dt = new Date(s);
+  } else {
+    // YYYY-MM-DD — add time to avoid timezone shift
+    dt = new Date(s.length === 10 && s[4] === "-" ? s + "T00:00:00" : s);
+  }
+  if (isNaN(dt)) return s;
   return dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 }
 function todayStr() {
@@ -26,12 +36,37 @@ function todayStr() {
 }
 function monthKey(dateStr) {
   if (!dateStr) return "";
-  return dateStr.slice(0, 7);
+  const s = String(dateStr).trim();
+  // YYYY-MM-DD format (standard)
+  if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 7);
+  // MM/DD/YYYY format (old system)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) {
+    const parts = s.split("/");
+    return parts[2] + "-" + parts[0].padStart(2, "0");
+  }
+  // M/D/YY or similar fallback
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toISOString().slice(0, 7);
+  return "";
 }
 function monthLabel(key) {
   if (!key) return "";
   const [y, m] = key.split("-");
+  if (!y || !m) return key;
   return new Date(y, m - 1).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+}
+
+// Normalize any date string to YYYY-MM-DD for sorting
+function normDate(d) {
+  if (!d) return "";
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) {
+    const [m, dd, y] = s.split("/");
+    return y + "-" + m.padStart(2,"0") + "-" + dd.padStart(2,"0");
+  }
+  const dt = new Date(s);
+  return isNaN(dt) ? s : dt.toISOString().slice(0, 10);
 }
 
 let _toastTimer = null;
@@ -707,7 +742,7 @@ function renderTransactionTable(tbodyId, rows, colsFn, openingBal, netFn) {
   }
   let running = openingBal;
   let html = "";
-  const sorted = rows.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const sorted = rows.slice().sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
   sorted.forEach(r => {
     running += netFn(r);
     html += colsFn(r, running);
@@ -721,7 +756,7 @@ function renderCashReceived() {
   let rows = APP.cashReceived.slice();
   if (search)     rows = rows.filter(r=>(r.client||r.particular||r.contract_no||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
-  rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  rows.sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
 
   const tb = $("crTbody");
   if (!rows.length) {
@@ -797,7 +832,7 @@ function renderCashExpense() {
   let rows = APP.cashExpense.slice();
   if (search)     rows = rows.filter(r=>(r.particular||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
-  rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  rows.sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
 
   const tb = $("ceTbody");
   if (!rows.length) {
@@ -865,7 +900,7 @@ function renderBankReceived() {
   let rows = APP.bankReceived.slice();
   if (search)     rows = rows.filter(r=>(r.client||r.contract_no||r.type||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
-  rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  rows.sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
 
   const tb = $("brTbody");
   if (!rows.length) {
@@ -938,7 +973,7 @@ function renderBankExpense() {
   let rows = APP.bankExpense.slice();
   if (search)     rows = rows.filter(r=>(r.particular||r.cv||r.check_no||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
-  rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  rows.sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
 
   const tb = $("beTbody");
   if (!rows.length) {
@@ -1009,7 +1044,7 @@ function renderPnbDeposit() {
   const dateFilter = $("pnbDateFilter")?.value||"";
   let rows = APP.pnbDeposit.slice();
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
-  rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  rows.sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
 
   const tb = $("pnbTbody");
   if (!rows.length) {
@@ -1077,7 +1112,7 @@ function renderDswd() {
   let rows = APP.dswd.slice();
   if (search) rows = rows.filter(r=>(r.deceased||r.contract_no||r.beneficiary||"").toLowerCase().includes(search));
   if (sFil)   rows = rows.filter(r=>r.status===sFil);
-  rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  rows.sort((a,b)=>normDate(a.date).localeCompare(normDate(b.date)));
 
   const pending = APP.dswd.filter(r=>r.status==="Waiting").reduce((s,r)=>s+(Number(r.dswd_refund)||0),0);
   const pendEl = $("dswdPendingDisplay"); if(pendEl) pendEl.textContent = fmtMoney(pending);
@@ -1207,7 +1242,7 @@ function renderBai() {
   let rows = APP.bai.slice();
   if (search) rows = rows.filter(r=>(r.contract_no||"").toLowerCase().includes(search));
   if (sFil)   rows = rows.filter(r=>r.status===sFil);
-  rows.sort((a,b)=>(a.date_applied||"").localeCompare(b.date_applied||""));
+  rows.sort((a,b)=>normDate(a.date_applied).localeCompare(normDate(b.date_applied)));
 
   const pending = APP.bai.filter(r=>r.status==="Pending").reduce((s,r)=>s+(Number(r.amount)||0),0);
   const pendEl = $("baiPendingDisplay"); if(pendEl) pendEl.textContent = fmtMoney(pending);
