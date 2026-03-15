@@ -715,37 +715,69 @@ function renderTransactionTable(tbodyId, rows, colsFn, openingBal, netFn) {
   tb.innerHTML = html;
 }
 
-// ── CASH RECEIVED ──────────────────────────────────────────────
 function renderCashReceived() {
-  const search    = ($("crSearch")?.value||"").toLowerCase();
-  const dateFilter= $("crDateFilter")?.value||"";
+  const search     = ($("crSearch")?.value||"").toLowerCase();
+  const dateFilter = $("crDateFilter")?.value||"";
   let rows = APP.cashReceived.slice();
   if (search)     rows = rows.filter(r=>(r.client||r.particular||r.contract_no||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
   rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const openBal = Number(APP.settings?.cash_balance)||0;
-  let running = openBal;
-  // Running balance over ALL data (not just filtered) up to first filtered row date
-  const allSorted = APP.cashReceived.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const allExp    = APP.cashExpense.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const allPnb    = APP.pnbDeposit.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
 
   const tb = $("crTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
-  running = openBal;
-  let html = "";
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  // Group by month
+  const groups = new Map();
+  const keyOrder = [];
   rows.forEach(r => {
-    running += Number(r.amount)||0;
-    html += `<tr>
-      <td>${fmtDate(r.date)}</td><td>${r.contract_no||"—"}</td>
-      <td>${r.receipt||"—"}</td><td>${r.client||"—"}</td>
-      <td>${r.particular||"—"}</td>
-      <td class="num" style="color:var(--success)">+${fmtNum(r.amount)}</td>
-      <td class="num"><strong>${fmtNum(running)}</strong></td>
-      <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
-      ${canEdit()?actionBtns(r.id,"editCR","deleteCR"):"<td></td>"}
-    </tr>`;
+    const k = monthKey(r.date||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
   });
+  keyOrder.sort();
+
+  const openBal = Number(APP.settings?.cash_balance)||0;
+  let running = openBal;
+  let html = "";
+  let grand = 0;
+
+  keyOrder.forEach((key, gi) => {
+    const grp = groups.get(key);
+    html += `<tr class="group-row"><td colspan="9">${monthLabel(key)}</td></tr>`;
+    let monthTotal = 0;
+    grp.forEach(r => {
+      running += Number(r.amount)||0;
+      monthTotal += Number(r.amount)||0;
+      html += `<tr>
+        <td>${fmtDate(r.date)}</td><td>${r.contract_no||"—"}</td>
+        <td>${r.receipt||"—"}</td><td>${r.client||"—"}</td>
+        <td>${r.particular||"—"}</td>
+        <td class="num" style="color:var(--success)">+${fmtNum(r.amount)}</td>
+        <td class="num"><strong>${fmtNum(running)}</strong></td>
+        <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
+        ${canEdit()?actionBtns(r.id,"editCR","deleteCR"):"<td></td>"}
+      </tr>`;
+    });
+    grand += monthTotal;
+    html += `<tr class="total-row">
+      <td colspan="5">TOTAL — ${monthLabel(key).toUpperCase()}</td>
+      <td class="num">+${fmtNum(monthTotal)}</td>
+      <td colspan="3"></td>
+    </tr>`;
+    if (gi < keyOrder.length - 1)
+      html += `<tr><td colspan="9" style="height:8px;border:none;background:transparent"></td></tr>`;
+  });
+
+  // Grand total
+  html += `<tr class="total-row" style="background:var(--gold);color:var(--navy)">
+    <td colspan="5">GRAND TOTAL</td>
+    <td class="num">+${fmtNum(grand)}</td>
+    <td colspan="3"></td>
+  </tr>`;
+
   tb.innerHTML = html;
 }
 $("crSearch")?.addEventListener("input", renderCashReceived);
@@ -759,22 +791,62 @@ window.deleteCR = async id => {
   renderCashReceived(); updateBalanceDisplays(); toast("Deleted.","success");
 };
 
-// ── CASH EXPENSE ──────────────────────────────────────────────
 function renderCashExpense() {
-  const search    = ($("ceSearch")?.value||"").toLowerCase();
-  const dateFilter= $("ceDateFilter")?.value||"";
+  const search     = ($("ceSearch")?.value||"").toLowerCase();
+  const dateFilter = $("ceDateFilter")?.value||"";
   let rows = APP.cashExpense.slice();
   if (search)     rows = rows.filter(r=>(r.particular||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
   rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+
   const tb = $("ceTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
-  tb.innerHTML = rows.map(r=>`<tr>
-    <td>${fmtDate(r.date)}</td><td>${r.particular||"—"}</td>
-    <td class="num" style="color:var(--danger)">−${fmtNum(r.amount)}</td>
-    <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
-    ${canEdit()?actionBtns(r.id,"editCE","deleteCE"):"<td></td>"}
-  </tr>`).join("");
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  const groups = new Map();
+  const keyOrder = [];
+  rows.forEach(r => {
+    const k = monthKey(r.date||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
+  });
+  keyOrder.sort();
+
+  let html = "";
+  let grand = 0;
+
+  keyOrder.forEach((key, gi) => {
+    const grp = groups.get(key);
+    html += `<tr class="group-row"><td colspan="5">${monthLabel(key)}</td></tr>`;
+    let monthTotal = 0;
+    grp.forEach(r => {
+      monthTotal += Number(r.amount)||0;
+      html += `<tr>
+        <td>${fmtDate(r.date)}</td><td>${r.particular||"—"}</td>
+        <td class="num" style="color:var(--danger)">−${fmtNum(r.amount)}</td>
+        <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
+        ${canEdit()?actionBtns(r.id,"editCE","deleteCE"):"<td></td>"}
+      </tr>`;
+    });
+    grand += monthTotal;
+    html += `<tr class="total-row">
+      <td colspan="2">TOTAL — ${monthLabel(key).toUpperCase()}</td>
+      <td class="num">−${fmtNum(monthTotal)}</td>
+      <td colspan="2"></td>
+    </tr>`;
+    if (gi < keyOrder.length - 1)
+      html += `<tr><td colspan="5" style="height:8px;border:none;background:transparent"></td></tr>`;
+  });
+
+  html += `<tr class="total-row" style="background:var(--gold);color:var(--navy)">
+    <td colspan="2">GRAND TOTAL</td>
+    <td class="num">−${fmtNum(grand)}</td>
+    <td colspan="2"></td>
+  </tr>`;
+
+  tb.innerHTML = html;
 }
 $("ceSearch")?.addEventListener("input", renderCashExpense);
 $("ceDateFilter")?.addEventListener("change", renderCashExpense);
@@ -787,29 +859,67 @@ window.deleteCE = async id => {
   renderCashExpense(); updateBalanceDisplays(); toast("Deleted.","success");
 };
 
-// ── BANK RECEIVED ─────────────────────────────────────────────
 function renderBankReceived() {
-  const search    = ($("brSearch")?.value||"").toLowerCase();
-  const dateFilter= $("brDateFilter")?.value||"";
+  const search     = ($("brSearch")?.value||"").toLowerCase();
+  const dateFilter = $("brDateFilter")?.value||"";
   let rows = APP.bankReceived.slice();
   if (search)     rows = rows.filter(r=>(r.client||r.contract_no||r.type||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
   rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+
   const tb = $("brTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  const groups = new Map();
+  const keyOrder = [];
+  rows.forEach(r => {
+    const k = monthKey(r.date||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
+  });
+  keyOrder.sort();
+
   const openBal = Number(APP.settings?.bank_balance)||0;
   let running = openBal;
-  tb.innerHTML = rows.map(r=>{
-    running += Number(r.amount)||0;
-    return `<tr>
-      <td>${fmtDate(r.date)}</td><td>${r.contract_no||"—"}</td>
-      <td>${r.type||"—"}</td><td>${r.client||"—"}</td>
-      <td class="num" style="color:var(--success)">+${fmtNum(r.amount)}</td>
-      <td class="num"><strong>${fmtNum(running)}</strong></td>
-      <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
-      ${canEdit()?actionBtns(r.id,"editBR","deleteBR"):"<td></td>"}
+  let html = "";
+  let grand = 0;
+
+  keyOrder.forEach((key, gi) => {
+    const grp = groups.get(key);
+    html += `<tr class="group-row"><td colspan="8">${monthLabel(key)}</td></tr>`;
+    let monthTotal = 0;
+    grp.forEach(r => {
+      running += Number(r.amount)||0;
+      monthTotal += Number(r.amount)||0;
+      html += `<tr>
+        <td>${fmtDate(r.date)}</td><td>${r.contract_no||"—"}</td>
+        <td>${r.type||"—"}</td><td>${r.client||"—"}</td>
+        <td class="num" style="color:var(--success)">+${fmtNum(r.amount)}</td>
+        <td class="num"><strong>${fmtNum(running)}</strong></td>
+        <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
+        ${canEdit()?actionBtns(r.id,"editBR","deleteBR"):"<td></td>"}
+      </tr>`;
+    });
+    grand += monthTotal;
+    html += `<tr class="total-row">
+      <td colspan="4">TOTAL — ${monthLabel(key).toUpperCase()}</td>
+      <td class="num">+${fmtNum(monthTotal)}</td>
+      <td colspan="3"></td>
     </tr>`;
-  }).join("");
+    if (gi < keyOrder.length - 1)
+      html += `<tr><td colspan="8" style="height:8px;border:none;background:transparent"></td></tr>`;
+  });
+
+  html += `<tr class="total-row" style="background:var(--gold);color:var(--navy)">
+    <td colspan="4">GRAND TOTAL</td>
+    <td class="num">+${fmtNum(grand)}</td>
+    <td colspan="3"></td>
+  </tr>`;
+
+  tb.innerHTML = html;
 }
 $("brSearch")?.addEventListener("input", renderBankReceived);
 $("brDateFilter")?.addEventListener("change", renderBankReceived);
@@ -822,29 +932,67 @@ window.deleteBR = async id => {
   renderBankReceived(); updateBalanceDisplays(); toast("Deleted.","success");
 };
 
-// ── BANK EXPENSE ──────────────────────────────────────────────
 function renderBankExpense() {
-  const search    = ($("beSearch")?.value||"").toLowerCase();
-  const dateFilter= $("beDateFilter")?.value||"";
+  const search     = ($("beSearch")?.value||"").toLowerCase();
+  const dateFilter = $("beDateFilter")?.value||"";
   let rows = APP.bankExpense.slice();
   if (search)     rows = rows.filter(r=>(r.particular||r.cv||r.check_no||"").toLowerCase().includes(search));
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
   rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+
   const tb = $("beTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  const groups = new Map();
+  const keyOrder = [];
+  rows.forEach(r => {
+    const k = monthKey(r.date||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
+  });
+  keyOrder.sort();
+
   const openBal = Number(APP.settings?.bank_balance)||0;
   let running = openBal + APP.bankReceived.reduce((s,r)=>s+(Number(r.amount)||0),0);
-  tb.innerHTML = rows.map(r=>{
-    running -= Number(r.withdraw)||0;
-    return `<tr>
-      <td>${fmtDate(r.date)}</td><td>${r.cv||"—"}</td>
-      <td>${r.check_no||"—"}</td><td>${r.particular||"—"}</td>
-      <td class="num" style="color:var(--danger)">−${fmtNum(r.withdraw)}</td>
-      <td class="num"><strong>${fmtNum(running)}</strong></td>
-      <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
-      ${canEdit()?actionBtns(r.id,"editBE","deleteBE"):"<td></td>"}
+  let html = "";
+  let grand = 0;
+
+  keyOrder.forEach((key, gi) => {
+    const grp = groups.get(key);
+    html += `<tr class="group-row"><td colspan="7">${monthLabel(key)}</td></tr>`;
+    let monthTotal = 0;
+    grp.forEach(r => {
+      running -= Number(r.withdraw)||0;
+      monthTotal += Number(r.withdraw)||0;
+      html += `<tr>
+        <td>${fmtDate(r.date)}</td><td>${r.cv||"—"}</td>
+        <td>${r.check_no||"—"}</td><td>${r.particular||"—"}</td>
+        <td class="num" style="color:var(--danger)">−${fmtNum(r.withdraw)}</td>
+        <td class="num"><strong>${fmtNum(running)}</strong></td>
+        <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
+        ${canEdit()?actionBtns(r.id,"editBE","deleteBE"):"<td></td>"}
+      </tr>`;
+    });
+    grand += monthTotal;
+    html += `<tr class="total-row">
+      <td colspan="4">TOTAL — ${monthLabel(key).toUpperCase()}</td>
+      <td class="num">−${fmtNum(monthTotal)}</td>
+      <td colspan="2"></td>
     </tr>`;
-  }).join("");
+    if (gi < keyOrder.length - 1)
+      html += `<tr><td colspan="7" style="height:8px;border:none;background:transparent"></td></tr>`;
+  });
+
+  html += `<tr class="total-row" style="background:var(--gold);color:var(--navy)">
+    <td colspan="4">GRAND TOTAL</td>
+    <td class="num">−${fmtNum(grand)}</td>
+    <td colspan="2"></td>
+  </tr>`;
+
+  tb.innerHTML = html;
 }
 $("beSearch")?.addEventListener("input", renderBankExpense);
 $("beDateFilter")?.addEventListener("change", renderBankExpense);
@@ -857,20 +1005,60 @@ window.deleteBE = async id => {
   renderBankExpense(); updateBalanceDisplays(); toast("Deleted.","success");
 };
 
-// ── PNB DEPOSIT ───────────────────────────────────────────────
 function renderPnbDeposit() {
   const dateFilter = $("pnbDateFilter")?.value||"";
   let rows = APP.pnbDeposit.slice();
   if (dateFilter) rows = rows.filter(r=>r.date===dateFilter);
   rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+
   const tb = $("pnbTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
-  tb.innerHTML = rows.map(r=>`<tr>
-    <td>${fmtDate(r.date)}</td>
-    <td class="num">${fmtNum(r.amount)}</td>
-    <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
-    ${canEdit()?actionBtns(r.id,"editPNB","deletePNB"):"<td></td>"}
-  </tr>`).join("");
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  const groups = new Map();
+  const keyOrder = [];
+  rows.forEach(r => {
+    const k = monthKey(r.date||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
+  });
+  keyOrder.sort();
+
+  let html = "";
+  let grand = 0;
+
+  keyOrder.forEach((key, gi) => {
+    const grp = groups.get(key);
+    html += `<tr class="group-row"><td colspan="4">${monthLabel(key)}</td></tr>`;
+    let monthTotal = 0;
+    grp.forEach(r => {
+      monthTotal += Number(r.amount)||0;
+      html += `<tr>
+        <td>${fmtDate(r.date)}</td>
+        <td class="num">${fmtNum(r.amount)}</td>
+        <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
+        ${canEdit()?actionBtns(r.id,"editPNB","deletePNB"):"<td></td>"}
+      </tr>`;
+    });
+    grand += monthTotal;
+    html += `<tr class="total-row">
+      <td>TOTAL — ${monthLabel(key).toUpperCase()}</td>
+      <td class="num">${fmtNum(monthTotal)}</td>
+      <td colspan="2"></td>
+    </tr>`;
+    if (gi < keyOrder.length - 1)
+      html += `<tr><td colspan="4" style="height:8px;border:none;background:transparent"></td></tr>`;
+  });
+
+  html += `<tr class="total-row" style="background:var(--gold);color:var(--navy)">
+    <td>GRAND TOTAL</td>
+    <td class="num">${fmtNum(grand)}</td>
+    <td colspan="2"></td>
+  </tr>`;
+
+  tb.innerHTML = html;
 }
 $("pnbDateFilter")?.addEventListener("change", renderPnbDeposit);
 $("btnAddPNB")?.addEventListener("click", () => openPnbForm({}));
@@ -891,29 +1079,115 @@ function renderDswd() {
   if (sFil)   rows = rows.filter(r=>r.status===sFil);
   rows.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
 
-  const pending = rows.filter(r=>r.status==="Waiting").reduce((s,r)=>s+(Number(r.dswd_refund)||0),0);
-  const el = $("dswdPendingDisplay"); if(el) el.textContent = fmtMoney(pending);
+  const pending = APP.dswd.filter(r=>r.status==="Waiting").reduce((s,r)=>s+(Number(r.dswd_refund)||0),0);
+  const pendEl = $("dswdPendingDisplay"); if(pendEl) pendEl.textContent = fmtMoney(pending);
 
   const tb = $("dswdTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="15" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
-  tb.innerHTML = rows.map(r=>{
-    const badgeCls = r.status==="Released"?"badge-paid":r.status==="Received"?"badge-active":"badge-pending";
-    return `<tr>
-      <td>${fmtDate(r.date)}</td><td>${r.contract_no||"—"}</td><td>${r.deceased||"—"}</td>
-      <td class="num">${fmtNum(r.contract_amt)}</td>
-      <td class="num">${fmtNum(r.payment)}</td>
-      <td class="num">${fmtNum(r.balance)}</td>
-      <td class="num">${fmtNum(r.dswd_refund)}</td>
-      <td class="num">${fmtNum(r.after_tax)}</td>
-      <td>${fmtDate(r.date_received)}</td>
-      <td class="num">${fmtNum(r.payable)}</td>
-      <td>${fmtDate(r.date_release)}</td>
-      <td>${r.beneficiary||"—"}</td>
-      <td class="num">${fmtNum(r.dswd_discount)}</td>
-      <td><span class="badge ${badgeCls}">${r.status}</span></td>
-      ${canEdit()?actionBtns(r.id,"editDSWD","deleteDSWD"):"<td></td>"}
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  // Group by month
+  const groups = new Map();
+  const keyOrder = [];
+  rows.forEach(r => {
+    const k = monthKey(r.date||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
+  });
+  keyOrder.sort();
+
+  // Global pre-pass: find last flat index + totals per date_received
+  const flatRows = [];
+  keyOrder.forEach(k => groups.get(k).forEach(r => flatRows.push(r)));
+  const drLastIdx = new Map();
+  const drTotals  = new Map();
+  flatRows.forEach((r, idx) => {
+    const dr = (r.date_received||"").trim();
+    if (!dr) return;
+    drLastIdx.set(dr, idx);
+    const t = drTotals.get(dr) || { refund:0, afterTax:0 };
+    t.refund   += Number(r.dswd_refund)||0;
+    t.afterTax += Number(r.after_tax) ||0;
+    drTotals.set(dr, t);
+  });
+
+  let html = "";
+  let flatIdx = 0;
+
+  keyOrder.forEach(key => {
+    const grp = groups.get(key);
+    html += `<tr class="group-row"><td colspan="15">${monthLabel(key).toUpperCase()}</td></tr>`;
+
+    let totContractAmt=0, totPayment=0, totBalance=0;
+    let totRefund=0, totAfterTax=0, totPayable=0, totDiscount=0;
+
+    grp.forEach(r => {
+      const curIdx = flatIdx++;
+      const linked = APP.contracts.find(c=>(c.contract_no||"").toLowerCase()===(r.contract_no||"").toLowerCase());
+      const liveBalance = linked ? computeContract(linked, APP.bai, APP.dswd).remaining : (Number(r.balance)||0);
+
+      totContractAmt += Number(r.contract_amt)||0;
+      totPayment     += Number(r.payment)     ||0;
+      totBalance     += liveBalance;
+      totRefund      += Number(r.dswd_refund) ||0;
+      totAfterTax    += Number(r.after_tax)   ||0;
+      totPayable     += Number(r.payable)     ||0;
+      totDiscount    += Number(r.dswd_discount)||0;
+
+      const badgeCls = r.status==="Released"?"badge-paid":r.status==="Received"?"badge-active":"badge-pending";
+      html += `<tr>
+        <td>${fmtDate(r.date)}</td>
+        <td>${r.contract_no||"—"}</td>
+        <td>${r.deceased||"—"}</td>
+        <td class="num">${fmtNum(r.contract_amt)}</td>
+        <td class="num">${fmtNum(r.payment)}</td>
+        <td class="num">${fmtNum(liveBalance)}</td>
+        <td class="num">${fmtNum(r.dswd_refund)}</td>
+        <td class="num">${fmtNum(r.after_tax)}</td>
+        <td>${fmtDate(r.date_received)}</td>
+        <td class="num">${fmtNum(r.payable)}</td>
+        <td>${fmtDate(r.date_release)}</td>
+        <td>${r.beneficiary||"—"}</td>
+        <td class="num">${fmtNum(r.dswd_discount)}</td>
+        <td><span class="badge ${badgeCls}">${r.status}</span></td>
+        ${canEdit()?actionBtns(r.id,"editDSWD","deleteDSWD"):"<td></td>"}
+      </tr>`;
+
+      // Batch total row after last occurrence of this date_received
+      const dr = (r.date_received||"").trim();
+      if (dr && drLastIdx.get(dr) === curIdx) {
+        const t = drTotals.get(dr);
+        html += `<tr style="background:var(--success-bg)">
+          <td colspan="6" style="padding:7px 12px;font-weight:600;font-size:12px;color:var(--success)">
+            Batch Total — Received on ${fmtDate(dr)}
+          </td>
+          <td class="num" style="font-weight:600;color:var(--success)">${fmtNum(t.refund)}</td>
+          <td class="num" style="font-weight:600;color:var(--success)">${fmtNum(t.afterTax)}</td>
+          <td colspan="7"></td>
+        </tr>`;
+      }
+    });
+
+    // Monthly total
+    html += `<tr class="total-row">
+      <td colspan="3">TOTAL — ${monthLabel(key).toUpperCase()}</td>
+      <td class="num">${fmtNum(totContractAmt)}</td>
+      <td class="num">${fmtNum(totPayment)}</td>
+      <td class="num">${fmtNum(totBalance)}</td>
+      <td class="num">${fmtNum(totRefund)}</td>
+      <td class="num">${fmtNum(totAfterTax)}</td>
+      <td></td>
+      <td class="num">${fmtNum(totPayable)}</td>
+      <td></td><td></td>
+      <td class="num">${fmtNum(totDiscount)}</td>
+      <td colspan="2"></td>
     </tr>`;
-  }).join("");
+    html += `<tr><td colspan="15" style="height:10px;border:none;background:transparent"></td></tr>`;
+  });
+
+  tb.innerHTML = html;
 }
 $("dswdSearch")?.addEventListener("input", renderDswd);
 $("dswdStatusFilter")?.addEventListener("change", renderDswd);
@@ -935,19 +1209,122 @@ function renderBai() {
   if (sFil)   rows = rows.filter(r=>r.status===sFil);
   rows.sort((a,b)=>(a.date_applied||"").localeCompare(b.date_applied||""));
 
-  const pending = rows.filter(r=>r.status==="Pending").reduce((s,r)=>s+(Number(r.amount)||0),0);
-  const el = $("baiPendingDisplay"); if(el) el.textContent = fmtMoney(pending);
+  const pending = APP.bai.filter(r=>r.status==="Pending").reduce((s,r)=>s+(Number(r.amount)||0),0);
+  const pendEl = $("baiPendingDisplay"); if(pendEl) pendEl.textContent = fmtMoney(pending);
 
   const tb = $("baiTbody");
-  if (!rows.length) { tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`; return; }
-  tb.innerHTML = rows.map(r=>`<tr>
-    <td>${fmtDate(r.date_applied)}</td><td>${r.contract_no||"—"}</td>
-    <td class="num">${fmtNum(r.amount)}</td>
-    <td>${fmtDate(r.date_completed)}</td>
-    <td><span class="badge ${r.status==="Collected"?"badge-paid":"badge-pending"}">${r.status}</span></td>
-    <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
-    ${canEdit()?actionBtns(r.id,"editBAI","deleteBAI"):"<td></td>"}
-  </tr>`).join("");
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:20px">No records.</td></tr>`;
+    return;
+  }
+
+  // Group by month using date_applied
+  const groups = new Map();
+  const keyOrder = [];
+  rows.forEach(r => {
+    const k = monthKey(r.date_applied||"");
+    if (!groups.has(k)) { groups.set(k, []); keyOrder.push(k); }
+    groups.get(k).push(r);
+  });
+  keyOrder.sort();
+
+  // Pre-compute BAI collected by month from Cash Received + Bank Received
+  // Cash Received: particular === "bai" (case-insensitive)
+  const cashBaiByMonth = new Map();
+  for (const r of APP.cashReceived) {
+    if ((r.particular||"").toLowerCase().trim() !== "bai") continue;
+    const k = monthKey(r.date||"");
+    cashBaiByMonth.set(k, (cashBaiByMonth.get(k)||0) + (Number(r.amount)||0));
+  }
+  // Bank Received: client === "bai office collection" (case-insensitive, strip hyphens)
+  const bankBaiByMonth = new Map();
+  for (const r of APP.bankReceived) {
+    const c = (r.client||"").toLowerCase().replace(/-/g," ").replace(/\s+/g," ").trim();
+    if (c !== "bai office collection") continue;
+    const k = monthKey(r.date||"");
+    bankBaiByMonth.set(k, (bankBaiByMonth.get(k)||0) + (Number(r.amount)||0));
+  }
+
+  let html = "";
+  let runningBalance = 0; // carries forward month to month
+
+  keyOrder.forEach(key => {
+    const grp = groups.get(key);
+
+    // Month header
+    html += `<tr class="group-row"><td colspan="7">${monthLabel(key).toUpperCase()}</td></tr>`;
+
+    // Previous Balance row (2nd month onward, only if non-zero)
+    if (runningBalance !== 0) {
+      const col = runningBalance > 0 ? "var(--danger)" : "var(--success)";
+      html += `<tr>
+        <td colspan="2" style="padding:4px 12px;font-style:italic;opacity:.85;color:${col}">Previous Balance</td>
+        <td class="num" style="font-style:italic;opacity:.85;color:${col}">${fmtNum(runningBalance)}</td>
+        <td colspan="4"></td>
+      </tr>`;
+    }
+
+    // Data rows
+    let monthTotal = 0;
+    grp.forEach(r => {
+      monthTotal += Number(r.amount)||0;
+      html += `<tr>
+        <td>${fmtDate(r.date_applied)}</td>
+        <td>${r.contract_no||"—"}</td>
+        <td class="num">${fmtNum(r.amount)}</td>
+        <td>${fmtDate(r.date_completed)}</td>
+        <td><span class="badge ${r.status==="Collected"?"badge-paid":"badge-pending"}">${r.status}</span></td>
+        <td style="font-size:11px;color:var(--text-3)">${r.created_by_email||""}</td>
+        ${canEdit()?actionBtns(r.id,"editBAI","deleteBAI"):"<td></td>"}
+      </tr>`;
+    });
+
+    // Monthly Total row
+    html += `<tr class="total-row">
+      <td colspan="2">Total BAI Applied</td>
+      <td class="num">${fmtNum(monthTotal)}</td>
+      <td colspan="4"></td>
+    </tr>`;
+
+    // BAI Collected breakdown
+    const cashBai = cashBaiByMonth.get(key)||0;
+    const bankBai = bankBaiByMonth.get(key)||0;
+    const totalCollected = cashBai + bankBai;
+
+    html += `<tr style="background:var(--surface2)">
+      <td colspan="2" style="padding:5px 12px;font-weight:600;font-style:italic">Total BAI Collected</td>
+      <td class="num" style="font-weight:600;font-style:italic">${fmtNum(totalCollected)}</td>
+      <td colspan="4"></td>
+    </tr>`;
+    if (cashBai > 0) {
+      html += `<tr>
+        <td colspan="2" style="padding:2px 12px 2px 28px;font-size:12px;color:var(--text-3)">↳ Cash Received (BAI)</td>
+        <td class="num" style="font-size:12px;color:var(--text-3)">${fmtNum(cashBai)}</td>
+        <td colspan="4"></td>
+      </tr>`;
+    }
+    if (bankBai > 0) {
+      html += `<tr>
+        <td colspan="2" style="padding:2px 12px 4px 28px;font-size:12px;color:var(--text-3)">↳ Bank Received (Bai Office Collection)</td>
+        <td class="num" style="font-size:12px;color:var(--text-3)">${fmtNum(bankBai)}</td>
+        <td colspan="4"></td>
+      </tr>`;
+    }
+
+    // Balance = previous + applied this month − collected
+    const balance = runningBalance + monthTotal - totalCollected;
+    const balCol  = balance > 0 ? "var(--danger)" : balance < 0 ? "var(--success)" : "inherit";
+    html += `<tr>
+      <td colspan="2" style="padding:5px 12px 10px;font-weight:700;color:${balCol}">Balance</td>
+      <td class="num" style="font-weight:700;color:${balCol};padding-bottom:10px">${fmtNum(balance)}</td>
+      <td colspan="4" style="padding-bottom:10px"></td>
+    </tr>`;
+    html += `<tr><td colspan="7" style="height:8px;border:none;background:transparent"></td></tr>`;
+
+    runningBalance = balance; // carry forward
+  });
+
+  tb.innerHTML = html;
 }
 $("baiSearch")?.addEventListener("input", renderBai);
 $("baiStatusFilter")?.addEventListener("change", renderBai);
